@@ -1,6 +1,7 @@
  
  const express = require('express');
  const cors = require('cors'); 
+ const jwt = require('jsonwebtoken')
  const { MongoClient, ServerApiVersion,ObjectId } = require('mongodb');
  require('dotenv').config()
  const app = express();
@@ -26,6 +27,25 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+
+const verifiJWT = (req,res, next) => {
+  console.log(req.headers.authorization);
+  const authorization = req.headers.authorization;
+  if(!authorization){
+    return res.status(401).send({error:true, message: 'unauthorizied token'})
+  }
+const token = authorization.split(' ')[1]; 
+jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (error, decoded) => {
+  if(error){
+  return res.status(403).send({error: true, message:'unauthorizied token'})
+  }
+  req.decoded = decoded;
+  next()
+});
+
+}
+
+
 
 async function run() {
   try {
@@ -54,10 +74,23 @@ async function run() {
         res.send(result)
     })
 
+    //jwt
+    app.post('/jwt', (req,res) => {
+      const user = req.body;
+      console.log(user)
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: '1h',
+      });
+      // console.log(token)
+      res.send({token})
+    })
+
+
 
       // bookings api
-    app.get('/bookings', async(req,res) => {
-      console.log(req.query.email)
+    app.get('/bookings',verifiJWT, async(req,res) => {
+      const decoded = req.decoded;
+      console.log('came back agin', decoded)
       let query = {};
       if(req.query?.email){
         query = {email: req.query.email}
